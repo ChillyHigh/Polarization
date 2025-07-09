@@ -108,7 +108,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>名称</th>
+                    <th>偏振片</th>
                     <th>角度(°)</th>
                     <th>操作</th>
                 </tr>
@@ -124,7 +124,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>偏振片</th>
+                    <th>胶带列表</th>
                     <th>厚度(μm)</th>
                     <th>角度(°)</th>
                     <th>操作</th>
@@ -135,7 +135,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>名称</th>
+                    <th>偏振片</th>
                     <th>角度(°)</th>
                     <th>操作</th>
                 </tr>
@@ -212,7 +212,7 @@
                 [{ x: wavelengths, y, type: 'scatter' }],
                 {
                     title: '出射光强与波长关系图',
-                    margin: { t: 50, l: 20, r: 10, b: 30 },
+                    margin: { t: 70, l: 20, r: 10, b: 30 },
                     yaxis: {
                         range: [0, Math.max(...y, 0.01) * 1.1]  // Y 轴从 0 到最大值的 1.2 倍
                     }
@@ -224,7 +224,7 @@
                 }
             );
             let X = 0, Y = 0, Z = 0;
-            const k = 0.015;
+            const k = 1;
             for (let i = 0; i < wavelengths.length; i++) {
                 const λ = wavelengths[i], I = y[i];
                 if (!(λ in cie)) continue;
