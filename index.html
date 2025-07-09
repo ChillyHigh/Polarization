@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>偏振光模拟器 + 显色</title>
+    <title>色偏振理论模拟</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
     <!-- SweetAlert2 -->
@@ -109,12 +109,14 @@
             <thead>
                 <tr>
                     <th>名称</th>
-                    <th>角度</th>
+                    <th>角度(°)</th>
+                    <th>操作</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>P1（入射）</td>
+                    <td id="angleP1">0</td>
                     <td><button onclick="openEditModal(-1, 'polarizer1')">编辑</button></td>
                 </tr>
             </tbody>
@@ -123,16 +125,24 @@
             <thead>
                 <tr>
                     <th>偏振片</th>
-                    <th>厚度</th>
-                    <th>角度</th>
+                    <th>厚度(μm)</th>
+                    <th>角度(°)</th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody id="tapeTableBody"></tbody>
         </table>
         <table>
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>角度(°)</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
             <tr>
                 <td>P2（出射）</td>
+                <td id="angleP2">90</td>
                 <td><button onclick="openEditModal(-2, 'polarizer2')">编辑</button></td>
             </tr>
             </tbody>
@@ -272,8 +282,14 @@
                 },
                 preConfirm: () => {
                     if (type === 'tape') { tapes[index] = target; updateTable(); }
-                    if (type === 'polarizer1') polarizer1Angle = target.a;
-                    if (type === 'polarizer2') polarizer2Angle = target.a;
+                    if (type === 'polarizer1') {
+                        polarizer1Angle = target.a;
+                        document.getElementById('angleP1').textContent = `${target.a.toFixed(0)}`;
+                    }
+                    if (type === 'polarizer2') {
+                        polarizer2Angle = target.a;
+                        document.getElementById('angleP2').textContent = `${target.a.toFixed(0)}`;
+                    }
                     plotAndColor();
                 },
                 showCancelButton: true
