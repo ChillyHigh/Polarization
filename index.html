@@ -212,7 +212,10 @@
                 [{ x: wavelengths, y, type: 'scatter' }],
                 {
                     title: '出射光强与波长关系图',
-                    margin: { t: 50, l: 20, r: 10, b: 30 }
+                    margin: { t: 50, l: 20, r: 10, b: 30 },
+                    yaxis: {
+                        range: [0, Math.max(...y, 0.01) * 1.1]  // Y 轴从 0 到最大值的 1.2 倍
+                    }
                 },
                 {
                     staticPlot: true,
