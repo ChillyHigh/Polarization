@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>偏振光模拟器 + 显色</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- jQuery + RoundSlider -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/round-slider@1.6.1/dist/roundslider.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/round-slider@1.6.1/dist/roundslider.min.js"></script>
+
+    <!-- noUiSlider -->
+    <link href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .left {
+            flex: 3;
+            min-width: 300px;
+        }
+
+        .right {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            text-align: center;
+        }
+
+        #colorbox {
+            width: 100%;
+            height: 80px;
+            margin-top: 10px;
+            border: 2px solid #333;
+            background-color: #fff;
+            transition: background-color 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            .left,
+            .right {
+                flex: none;
+                width: 100%;
+            }
+
+            input[type="number"] {
+                width: 100%;
+                max-width: 100px;
+            }
+
+            button {
+                width: 100%;
+                max-width: 150px;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            #plot {
+                height: 300px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="left">
+        <h2>色偏振理论模拟</h2>
+        <button onclick="addTape()">添加胶带</button>
+        <button onclick="resetTapes()">重置全部</button>
+        <div id="plot" style="width: 100%; height: 500px;"></div>
+    </div>
+
+    <div class="right">
+        <h2>模拟颜色</h2>
+        <div id="colorbox"></div>
+
+        <h2>光学器件列表</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>角度</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>P1（入射）</td>
+                    <td><button onclick="openEditModal(-1, 'polarizer1')">编辑</button></td>
+                </tr>
+            </tbody>
+        </table>
+        <table>
+            <thead>
+                <tr>
+                    <th>偏振片</th>
+                    <th>厚度</th>
+                    <th>角度</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="tapeTableBody"></tbody>
+        </table>
+        <table>
+            <tr>
+                <td>P2（出射）</td>
+                <td><button onclick="openEditModal(-2, 'polarizer2')">编辑</button></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const delta_n = 0.015;
+        let tapes = [];
+        let polarizer1Angle = 0;
+        let polarizer2Angle = 90;
+        const S_in = [2, 0, 0, 0];
+        let wavelengths = [];
+        let cie = {};
+
+        async function loadCIE() {
+            try {
+                const res = await fetch('CIE_xyz_1931_2deg.csv');
+                const text = await res.text();
+                parseCIECSV(text);
+                plotAndColor();
+            } catch (e) {
+                alert('加载 CIE 数据失败');
+            }
+        }
+
+        function parseCIECSV(text) {
+            const lines = text.trim().split('\n');
+            for (let i = 1; i < lines.length; i++) {
+                const [w, x, y, z] = lines[i].split(',').map(parseFloat);
+                if (!isNaN(w) && !isNaN(x)) cie[Math.round(w)] = [x, y, z];
+            }
+            wavelengths = Object.keys(cie).map(Number).sort((a, b) => a - b);
+        }
+
+        function deg2rad(d) { return d * Math.PI / 180; }
+        function muellerPolarizer(angle) {
+            const t = deg2rad(angle), c2 = Math.cos(2 * t), s2 = Math.sin(2 * t);
+            return [
+                [1, c2, s2, 0], [c2, c2 ** 2, c2 * s2, 0],
+                [s2, c2 * s2, s2 ** 2, 0], [0, 0, 0, 0]
+            ].map(r => r.map(v => 0.5 * v));
+        }
+        function muellerTape(d, angle, λ) {
+            const Δ = 2 * Math.PI * delta_n * d * 1e3 / λ;
+            const t = deg2rad(angle), c2 = Math.cos(2 * t), s2 = Math.sin(2 * t);
+            const cd = Math.cos(Δ), sd = Math.sin(Δ);
+            return [
+                [1, 0, 0, 0],
+                [0, c2 ** 2 + s2 ** 2 * cd, c2 * s2 * (1 - cd), s2 * sd],
+                [0, c2 * s2 * (1 - cd), c2 ** 2 * cd + s2 ** 2, -c2 * sd],
+                [0, -s2 * sd, c2 * sd, cd]
+            ].map(r => r.map(v => 0.5 * v));
+        }
+        function applyMueller(M, S) {
+            return M.map(row => row.reduce((sum, v, i) => sum + v * S[i], 0));
+        }
+        function getI(λ) {
+            let S = [...S_in];
+            const elements = [muellerPolarizer(polarizer1Angle), ...tapes.map(t => muellerTape(t.d, t.a, λ)), muellerPolarizer(polarizer2Angle)];
+            for (let M of elements) S = applyMueller(M, S);
+            return S[0];
+        }
+        function plotAndColor() {
+            const y = wavelengths.map(λ => getI(λ));
+            Plotly.newPlot('plot',
+                [{ x: wavelengths, y, type: 'scatter' }],
+                {
+                    title: '出射光强与波长关系图',
+                    margin: { t: 50, l: 20, r: 10, b: 30 }
+                },
+                {
+                    staticPlot: true,
+                    displayModeBar: false,
+                    responsive: true
+                }
+            );
+            let X = 0, Y = 0, Z = 0;
+            const k = 0.015;
+            for (let i = 0; i < wavelengths.length; i++) {
+                const λ = wavelengths[i], I = y[i];
+                if (!(λ in cie)) continue;
+                const [x̄, ȳ, z̄] = cie[λ];
+                X += I * x̄ * k;
+                Y += I * ȳ * k;
+                Z += I * z̄ * k;
+            }
+            let R = 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+            let G = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+            let B = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+            function gamma(v) { return v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055; }
+            R = gamma(R); G = gamma(G); B = gamma(B);
+            R = Math.min(255, Math.max(0, R * 255));
+            G = Math.min(255, Math.max(0, G * 255));
+            B = Math.min(255, Math.max(0, B * 255));
+            document.getElementById("colorbox").style.backgroundColor = `rgb(${R},${G},${B})`;
+        }
+
+        function addTape() {
+            tapes.push({ d: 20, a: 30 });
+            updateTable(); plotAndColor();
+        }
+        function resetTapes() {
+            tapes = [];
+            updateTable(); plotAndColor();
+        }
+        function updateTable() {
+            const tbody = document.getElementById('tapeTableBody');
+            tbody.innerHTML = '';
+            tapes.forEach((t, i) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${i + 1}</td><td>${t.d}</td><td>${t.a}</td><td><button onclick="openEditModal(${i}, 'tape')">编辑</button> <button onclick="deleteTape(${i})">删除</button></td>`;
+                tbody.appendChild(row);
+            });
+        }
+        function deleteTape(i) {
+            tapes.splice(i, 1); updateTable(); plotAndColor();
+        }
+
+        function openEditModal(index, type) {
+            let target = {};
+            if (type === 'tape') target = { ...tapes[index] };
+            if (type === 'polarizer1') target = { a: polarizer1Angle };
+            if (type === 'polarizer2') target = { a: polarizer2Angle };
+
+            Swal.fire({
+                title: '编辑参数',
+                html: `<div style="margin:10px 0">角度: <div id="angleSlider"></div></div>
+               ${type === 'tape' ? '<div>厚度: <div id="thicknessSlider"></div></div>' : ''}`,
+                didOpen: () => {
+                    $('#angleSlider').roundSlider({ radius: 60, width: 18, min: 0, max: 180, step: 1, value: target.a, drag: e => target.a = e.value });
+                    if (type === 'tape') {
+                        noUiSlider.create(document.getElementById('thicknessSlider'), {
+                            start: [target.d], step: 1, connect: [true, false], tooltips: true, range: { min: 0, max: 100 }
+                        }).on('update', (v) => target.d = parseFloat(v[0]));
+                    }
+                },
+                preConfirm: () => {
+                    if (type === 'tape') { tapes[index] = target; updateTable(); }
+                    if (type === 'polarizer1') polarizer1Angle = target.a;
+                    if (type === 'polarizer2') polarizer2Angle = target.a;
+                    plotAndColor();
+                },
+                showCancelButton: true
+            });
+        }
+
+        window.addEventListener('resize', plotAndColor);
+        loadCIE();
+    </script>
+</body>
+
+</html>
