@@ -195,7 +195,7 @@
                 [0, c2 ** 2 + s2 ** 2 * cd, c2 * s2 * (1 - cd), s2 * sd],
                 [0, c2 * s2 * (1 - cd), c2 ** 2 * cd + s2 ** 2, -c2 * sd],
                 [0, -s2 * sd, c2 * sd, cd]
-            ].map(r => r.map(v => 0.5 * v));
+            ];
         }
         function applyMueller(M, S) {
             return M.map(row => row.reduce((sum, v, i) => sum + v * S[i], 0));
